@@ -14,13 +14,15 @@
 # =============================================================================
 
 set -euo pipefail
-cd "$(dirname "$(dirname "${BASH_SOURCE[0]}")")"
+
+PROJECT_DIR="/scratch/hcakmak20/pannet_pipeline"
+cd "$PROJECT_DIR"
 
 H5_DIR="${H5_DIR:-/scratch/hcakmak20/pannet_pipeline/features}"
 GRAPH_DIR="${GRAPH_DIR:-/scratch/hcakmak20/pannet_pipeline/graphs}"
 AE_CKPT="${AE_CKPT:-checkpoints/autoencoder/best.ckpt}"
 
-mkdir -p logs "$GRAPH_DIR"
+mkdir -p "$PROJECT_DIR/logs" "$GRAPH_DIR"
 
 # Build graphs for each hop/border distance combination
 for DISTANCE in 1 2 3; do

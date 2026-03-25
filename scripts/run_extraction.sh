@@ -24,8 +24,7 @@
 
 set -euo pipefail
 
-SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-PROJECT_DIR="$(dirname "$SCRIPT_DIR")"
+PROJECT_DIR="/scratch/hcakmak20/pannet_pipeline"
 cd "$PROJECT_DIR"
 
 # Configurable paths (override via --export)
@@ -33,7 +32,7 @@ WSI_DIR="${WSI_DIR:-/userfiles/cgunduz/new_datasets/pannet_dataset/IPS/PANNET Sl
 OUTPUT_DIR="${OUTPUT_DIR:-/scratch/hcakmak20/pannet_pipeline/features}"
 CLASSIFIER_CKPT="${CLASSIFIER_CKPT:-checkpoints/patch_classifier/best.ckpt}"
 
-mkdir -p logs "$OUTPUT_DIR"
+mkdir -p "$PROJECT_DIR/logs" "$OUTPUT_DIR"
 
 echo "=== Stage 1a: Extracting VirChow2 features ==="
 uv run python -m src.stage1_extraction.extract_features \

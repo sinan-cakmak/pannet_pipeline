@@ -22,7 +22,9 @@
 # =============================================================================
 
 set -euo pipefail
-cd "$(dirname "$(dirname "${BASH_SOURCE[0]}")")"
+
+PROJECT_DIR="/scratch/hcakmak20/pannet_pipeline"
+cd "$PROJECT_DIR"
 
 # Configurable via --export
 TEST_FOLD=${SLURM_ARRAY_TASK_ID:-${TEST_FOLD:-0}}
@@ -34,7 +36,7 @@ BORDER_DISTANCE="${BORDER_DISTANCE:-3}"
 # 25 seeds from thesis evaluation protocol
 SEEDS="42 777 5999 3232 2832 4211 1819 1412 1997 14273 31764 29145 86392 3231 3233 4 6 11 13 105 107 112 116 117 119"
 
-mkdir -p logs experiments
+mkdir -p "$PROJECT_DIR/logs" "$PROJECT_DIR/experiments"
 
 echo "=== Fold $TEST_FOLD, $NUM_LAYERS layer(s), border=$BORDER_DISTANCE ==="
 

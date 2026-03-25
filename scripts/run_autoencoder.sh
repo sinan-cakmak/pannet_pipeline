@@ -14,11 +14,13 @@
 # =============================================================================
 
 set -euo pipefail
-cd "$(dirname "$(dirname "${BASH_SOURCE[0]}")")"
+
+PROJECT_DIR="/scratch/hcakmak20/pannet_pipeline"
+cd "$PROJECT_DIR"
 
 H5_DIR="${H5_DIR:-/scratch/hcakmak20/pannet_pipeline/features}"
 
-mkdir -p logs checkpoints/autoencoder
+mkdir -p "$PROJECT_DIR/logs" "$PROJECT_DIR/checkpoints/autoencoder"
 
 uv run python -m src.stage2_autoencoder.train \
     --h5-dir "$H5_DIR" \
