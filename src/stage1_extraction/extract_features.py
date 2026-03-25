@@ -2,23 +2,15 @@
 STAGE 1a: WSI → H5 feature files.
 
 Extracts patch-level features from whole-slide images using the Trident
-pipeline with the VirChow2 foundation model.
+Processor API with the VirChow2 foundation model.
 
-What happens here:
-  1. Each WSI (.tiff) is opened at 40x magnification.
-  2. GrandQC segments the tissue from the glass background.
-  3. Tissue regions are tiled into 1024×1024 non-overlapping patches.
-  4. Patches with <60% tissue are discarded.
-  5. VirChow2 encodes each patch into a 1280-dimensional feature vector.
-  6. Features, coordinates, and metadata are saved as an H5 file per slide.
+What happens (3 sequential Trident tasks):
+  1. seg:    GrandQC segments tissue from glass background → GeoJSON contours
+  2. coords: Tile tissue regions into 1024×1024 patches at 40x → coordinate lists
+  3. feat:   VirChow2 encodes each patch → H5 files with (N, 1280) features
 
 Supports chunked processing for parallel execution across multiple GPUs:
-  --chunk 0 --num-chunks 8  → process slides 0, 8, 16, 24, ...
-  --chunk 1 --num-chunks 8  → process slides 1, 9, 17, 25, ...
-
-Output H5 structure per slide:
-  features      (N, 1280)  — VirChow2 embeddings
-  coords        (N, 2)     — (x, y) top-left pixel coordinates of each patch
+  --chunk 0 --num-chunks 8  → processes slides 0, 8, 16, 24, ...
 
 Usage:
   uv run python -m src.stage1_extraction.extract_features \\
@@ -31,35 +23,72 @@ from __future__ import annotations
 
 import argparse
 import os
-import shutil
 import sys
 import tempfile
 from pathlib import Path
 
+import torch
 from dotenv import load_dotenv
 
 from src.constants import MAGNIFICATION, MIN_TISSUE_RATIO, PATCH_SIZE
 
 
-def extract_features(wsi_dir: str, output_dir: str) -> None:
+def run_trident_pipeline(wsi_dir: str, output_dir: str, gpu: int = 0) -> None:
     """
-    Run Trident's batch feature extraction on all WSIs in a directory.
-    """
-    from trident.run_batch_of_slides import main as trident_main
+    Run all 3 Trident tasks (seg → coords → feat) using the Processor API.
 
-    sys.argv = [
-        "run_batch_of_slides",
-        "--wsi_dir", wsi_dir,
-        "--save_dir", output_dir,
-        "--patch_encoder", "virchow2",
-        "--segmenter", "grandqc",
-        "--mag", str(MAGNIFICATION),
-        "--patch_size", str(PATCH_SIZE),
-        "--min_tissue_proportion", str(MIN_TISSUE_RATIO),
-        "--batch_size", "32",
-        "--remove_artifacts",
-    ]
-    trident_main()
+    Args:
+        wsi_dir: Directory containing WSI .tiff files to process
+        output_dir: Directory to save all outputs (segmentation, coords, features)
+        gpu: GPU index to use
+    """
+    from trident import Processor
+    from trident.segmentation_models.load import segmentation_model_factory
+    from trident.patch_encoder_models.load import encoder_factory
+
+    device = f"cuda:{gpu}" if torch.cuda.is_available() else "cpu"
+
+    # Initialize Trident Processor
+    processor = Processor(
+        job_dir=output_dir,
+        wsi_source=wsi_dir,
+        wsi_ext=".tiff",
+    )
+
+    # Task 1: Tissue segmentation via GrandQC
+    print("  [seg] Running GrandQC tissue segmentation...")
+    seg_model = segmentation_model_factory("grandqc")
+    artifact_remover = segmentation_model_factory("grandqc_artifact")
+    processor.run_segmentation_job(
+        seg_model,
+        seg_mag=seg_model.target_mag,
+        holes_are_tissue=True,
+        artifact_remover_model=artifact_remover,
+        batch_size=32,
+        device=device,
+    )
+
+    # Task 2: Patch coordinate extraction
+    print("  [coords] Extracting patch coordinates at 40x, 1024px...")
+    coords_dir = f"{MAGNIFICATION}x_{PATCH_SIZE}px_0px_overlap"
+    processor.run_patching_job(
+        target_magnification=MAGNIFICATION,
+        patch_size=PATCH_SIZE,
+        overlap=0,
+        saveto=coords_dir,
+        min_tissue_proportion=MIN_TISSUE_RATIO,
+    )
+
+    # Task 3: VirChow2 feature extraction → H5 files
+    print("  [feat] Extracting VirChow2 features...")
+    encoder = encoder_factory("virchow2")
+    processor.run_patch_feature_extraction_job(
+        coords_dir=coords_dir,
+        patch_encoder=encoder,
+        device=device,
+        saveas="h5",
+        batch_limit=32,
+    )
 
 
 def main() -> None:
@@ -69,7 +98,8 @@ def main() -> None:
         description="Stage 1a: Extract VirChow2 features from WSIs using Trident"
     )
     parser.add_argument("--wsi-dir", required=True, help="Directory containing raw WSI .tiff files")
-    parser.add_argument("--output-dir", required=True, help="Directory to save H5 feature files")
+    parser.add_argument("--output-dir", required=True, help="Directory to save output")
+    parser.add_argument("--gpu", type=int, default=0, help="GPU index")
     parser.add_argument("--chunk", type=int, default=0, help="Which chunk to process (0-indexed)")
     parser.add_argument("--num-chunks", type=int, default=1, help="Total number of parallel chunks")
     args = parser.parse_args()
@@ -91,15 +121,15 @@ def main() -> None:
 
     if args.num_chunks == 1:
         # Single chunk — process entire directory directly
-        extract_features(str(wsi_dir), args.output_dir)
+        run_trident_pipeline(str(wsi_dir), args.output_dir, args.gpu)
     else:
         # Multi-chunk — create a temp directory with symlinks to this chunk's WSIs.
-        # Trident processes everything in its input directory, so we give it only our subset.
+        # Trident's Processor scans its wsi_source directory, so we give it only our subset.
         with tempfile.TemporaryDirectory(prefix=f"trident_chunk{args.chunk}_") as tmp_dir:
             for wsi_path in my_wsis:
                 os.symlink(wsi_path, Path(tmp_dir) / wsi_path.name)
-            print(f"Created symlink directory with {len(my_wsis)} WSIs: {tmp_dir}")
-            extract_features(tmp_dir, args.output_dir)
+            print(f"Created symlink directory with {len(my_wsis)} WSIs")
+            run_trident_pipeline(tmp_dir, args.output_dir, args.gpu)
 
     print(f"Chunk {args.chunk} complete.")
 
