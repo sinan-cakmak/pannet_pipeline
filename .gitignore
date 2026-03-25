@@ -1,0 +1,13 @@
+*.pkl
+dataset_gnn/
+dataset2_gnn/
+__pycache__/
+*.pyc
+.venv/
+logs/
+.uv/
+.DS_Store
+*.pth
+*.zip
+.env
+~*
