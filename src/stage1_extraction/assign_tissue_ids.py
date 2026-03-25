@@ -93,13 +93,17 @@ def assign_patches_to_tissue(
     return joined["index_right"].fillna(0).astype(np.int64).values
 
 
-def assign_all_h5(h5_dir: str) -> None:
+def assign_all_h5(h5_dir: str, chunk: int = 0, num_chunks: int = 1) -> None:
     """
-    Process all H5 files: read contours, assign tissue_ids, save back.
+    Process H5 files: read contours, assign tissue_ids, save back.
+
+    Supports chunked processing for parallel execution.
     """
     h5_path = Path(h5_dir)
-    h5_files = sorted(h5_path.glob("**/*.h5"))
+    all_h5_files = sorted(h5_path.glob("**/*.h5"))
+    h5_files = all_h5_files[chunk::num_chunks]
     contour_dir = h5_path / "contours_geojson"
+    print(f"Chunk {chunk}/{num_chunks}: assigning tissue IDs for {len(h5_files)}/{len(all_h5_files)} files")
 
     for h5_file in track(h5_files, description="Assigning tissue IDs"):
         geojson_file = contour_dir / f"{h5_file.stem}.geojson"
@@ -125,8 +129,10 @@ def main() -> None:
         description="Stage 1c: Assign tissue IDs to patches from GeoJSON contours"
     )
     parser.add_argument("--h5-dir", required=True, help="Directory with H5 files")
+    parser.add_argument("--chunk", type=int, default=0, help="Which chunk (0-indexed)")
+    parser.add_argument("--num-chunks", type=int, default=1, help="Total parallel chunks")
     args = parser.parse_args()
-    assign_all_h5(args.h5_dir)
+    assign_all_h5(args.h5_dir, args.chunk, args.num_chunks)
 
 
 if __name__ == "__main__":

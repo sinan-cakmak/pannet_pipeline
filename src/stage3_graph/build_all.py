@@ -53,6 +53,8 @@ def main() -> None:
     parser.add_argument("--hop-distance", type=int, default=3)
     parser.add_argument("--border-distance", type=int, default=3)
     parser.add_argument("--device", default="cpu")
+    parser.add_argument("--chunk", type=int, default=0, help="Which chunk (0-indexed)")
+    parser.add_argument("--num-chunks", type=int, default=1, help="Total parallel chunks")
     args = parser.parse_args()
 
     output_dir = Path(args.output_dir)
@@ -67,10 +69,11 @@ def main() -> None:
     print(f"Loading autoencoder from: {args.ae_checkpoint}")
     encoder = load_encoder(args.ae_checkpoint, args.device)
 
-    # Process all H5 files
+    # Process H5 files (chunked for parallel execution)
     h5_dir = Path(args.h5_dir)
-    h5_files = sorted(h5_dir.glob("**/*.h5"))
-    print(f"Found {len(h5_files)} H5 files")
+    all_h5_files = sorted(h5_dir.glob("**/*.h5"))
+    h5_files = all_h5_files[args.chunk :: args.num_chunks]
+    print(f"Chunk {args.chunk}/{args.num_chunks}: processing {len(h5_files)}/{len(all_h5_files)} H5 files")
 
     saved = 0
     skipped = 0

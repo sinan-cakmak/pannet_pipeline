@@ -64,19 +64,20 @@ class PatchClassifier(nn.Module):
         return self.classifier(x)
 
 
-def classify_all_h5(h5_dir: str, checkpoint_path: str, device: str = "cuda") -> None:
+def classify_all_h5(
+    h5_dir: str, checkpoint_path: str, device: str = "cuda",
+    chunk: int = 0, num_chunks: int = 1,
+) -> None:
     """
-    Run patch classification on all H5 files and save patch_classes into each.
+    Run patch classification on H5 files and save patch_classes into each.
 
-    For each H5 file:
-      1. Load the 'features' dataset (N, 1280 or 2560)
-      2. If features are 1280-d, duplicate to create 2560-d input
-         (in practice, VirChow2 outputs class_token + patch_tokens as 2560-d)
-      3. Run the classifier in inference mode
-      4. Save argmax predictions as 'patch_classes' dataset in the H5 file
+    Supports chunked processing for parallel execution:
+      chunk=0, num_chunks=8 → process files 0, 8, 16, ...
     """
     h5_path = Path(h5_dir)
-    h5_files = sorted(h5_path.glob("**/*.h5"))
+    all_h5_files = sorted(h5_path.glob("**/*.h5"))
+    h5_files = all_h5_files[chunk::num_chunks]
+    print(f"Chunk {chunk}/{num_chunks}: classifying {len(h5_files)}/{len(all_h5_files)} H5 files")
     if not h5_files:
         print(f"No H5 files found in {h5_dir}")
         return
@@ -118,8 +119,10 @@ def main() -> None:
     parser.add_argument("--h5-dir", required=True, help="Directory with H5 files")
     parser.add_argument("--checkpoint", required=True, help="Patch classifier checkpoint")
     parser.add_argument("--device", default="cuda", help="Device (cuda or cpu)")
+    parser.add_argument("--chunk", type=int, default=0, help="Which chunk (0-indexed)")
+    parser.add_argument("--num-chunks", type=int, default=1, help="Total parallel chunks")
     args = parser.parse_args()
-    classify_all_h5(args.h5_dir, args.checkpoint, args.device)
+    classify_all_h5(args.h5_dir, args.checkpoint, args.device, args.chunk, args.num_chunks)
 
 
 if __name__ == "__main__":

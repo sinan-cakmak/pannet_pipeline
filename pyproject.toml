@@ -21,9 +21,16 @@ dependencies = [
     # Config
     "python-dotenv>=1.0.0",
     "pyyaml>=6.0",
+    # Stage 1: WSI processing (also needed by Trident)
+    "geopandas>=1.0.0",
+    "shapely>=2.0.0",
+    "huggingface-hub>=0.20.0",
+    "opencv-python>=4.9.0",
+    "openslide-python>=1.3.0",
     # Output
     "openpyxl>=3.1.0",
     "rich>=13.0.0",
+    "python-pptx>=1.0.2",
 ]
 
 [tool.hatch.build.targets.wheel]
@@ -36,3 +43,8 @@ build-backend = "hatchling.build"
 # PyTorch Geometric: install from PyPI (has CPU wheels).
 # On HPC with CUDA, install PyG CUDA extensions separately:
 #   uv pip install pyg-lib torch-scatter torch-sparse -f https://data.pyg.org/whl/torch-2.8.0+cu129.html
+
+# Trident (WSI preprocessing): install separately as editable local package.
+# It uses Poetry and has a strict Python <3.12 constraint that can be ignored.
+#   cd /path/to/pannet_pipeline
+#   uv pip install -e ../trident --no-build-isolation
