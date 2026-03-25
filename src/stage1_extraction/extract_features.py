@@ -52,7 +52,7 @@ def run_trident_pipeline(wsi_dir: str, output_dir: str, gpu: int = 0) -> None:
     processor = Processor(
         job_dir=output_dir,
         wsi_source=wsi_dir,
-        wsi_ext=".tiff",
+        wsi_ext=[".tiff"],
     )
 
     # Task 1: Tissue segmentation via GrandQC
