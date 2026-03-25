@@ -26,6 +26,11 @@ set -euo pipefail
 PROJECT_DIR="/scratch/hcakmak20/pannet_pipeline"
 cd "$PROJECT_DIR"
 
+# Load HF_TOKEN from .env for model downloads
+if [ -f "$PROJECT_DIR/.env" ]; then
+    export $(grep -v '^#' "$PROJECT_DIR/.env" | xargs)
+fi
+
 CHUNK=${SLURM_ARRAY_TASK_ID:-0}
 NUM_CHUNKS=${NUM_CHUNKS:-8}
 
