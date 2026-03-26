@@ -129,3 +129,7 @@ class PanNETDataModule(L.LightningDataModule):
             num_workers=self.num_workers,
             pin_memory=True,
         )
+
+    def predict_dataloader(self) -> DataLoader:
+        # predict() runs on the test set
+        return self.test_dataloader()
