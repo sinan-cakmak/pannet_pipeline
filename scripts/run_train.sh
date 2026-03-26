@@ -27,7 +27,10 @@ PROJECT_DIR="/scratch/hcakmak20/pannet_pipeline"
 cd "$PROJECT_DIR"
 
 GRAPH_DIR="${GRAPH_DIR:-/scratch/hcakmak20/pannet_pipeline/graphs}"
-AE_CKPT="${AE_CKPT:-checkpoints/autoencoder/best.ckpt}"
+# Auto-detect latest autoencoder checkpoint
+AE_CKPT="${AE_CKPT:-$(ls -t "$PROJECT_DIR"/checkpoints/autoencoder/autoencoder-*.ckpt 2>/dev/null | head -1)}"
+if [ -z "$AE_CKPT" ]; then echo "ERROR: No autoencoder checkpoint found"; exit 1; fi
+echo "Using AE checkpoint: $AE_CKPT"
 NUM_LAYERS="${NUM_LAYERS:-1}"
 BORDER_DISTANCE="${BORDER_DISTANCE:-3}"
 
