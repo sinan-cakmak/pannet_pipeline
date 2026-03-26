@@ -70,7 +70,7 @@ for COMBO in "${ALL_COMBOS[@]}"; do
             --max-epochs 200 \
             --output-dir experiments
     fi
-    ((IDX++))
+    IDX=$((IDX + 1))
 done
 
 echo "=== Chunk $CHUNK complete ==="
