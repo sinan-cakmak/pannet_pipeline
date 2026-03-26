@@ -109,12 +109,12 @@ def compute_metrics(y_true: list[int], y_pred: list[int]) -> dict[str, float]:
     qwk = quadratic_weighted_kappa(y_true_arr, y_pred_arr, n_classes=3)
 
     return {
-        "f1_ips_a": per_class_f1[0],
-        "f1_ips_b": per_class_f1[1],
-        "f1_ips_c": per_class_f1[2],
-        "f1_macro": macro_f1,
-        "f1_weighted": weighted_f1,
-        "qwk": qwk,
+        "f1_ips_a": float(per_class_f1[0]),
+        "f1_ips_b": float(per_class_f1[1]),
+        "f1_ips_c": float(per_class_f1[2]),
+        "f1_macro": float(macro_f1),
+        "f1_weighted": float(weighted_f1),
+        "qwk": float(qwk),
         "num_patients": len(y_true),
     }
 
