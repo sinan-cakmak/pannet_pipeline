@@ -32,7 +32,7 @@ from pathlib import Path
 
 import lightning as L
 import torch
-from lightning.pytorch.callbacks import EarlyStopping, ModelCheckpoint, RichProgressBar
+from lightning.pytorch.callbacks import EarlyStopping, ModelCheckpoint
 
 from src.stage2_autoencoder.model import AutoEncoder
 from src.stage5_training.data_module import PanNETDataModule
@@ -100,7 +100,6 @@ def main() -> None:
             mode="min",
             save_top_k=1,
         ),
-        RichProgressBar(),
     ]
 
     # ---- Train ----

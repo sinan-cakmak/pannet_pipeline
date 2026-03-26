@@ -17,8 +17,7 @@ import argparse
 from pathlib import Path
 
 import lightning as L
-from lightning.pytorch.callbacks import EarlyStopping, ModelCheckpoint, RichProgressBar
-from lightning.pytorch.callbacks.rich_model_summary import RichModelSummary
+from lightning.pytorch.callbacks import EarlyStopping, ModelCheckpoint
 from torch.utils.data import DataLoader
 
 from src.stage2_autoencoder.dataset import PatchFeatureDataset
@@ -88,7 +87,7 @@ def main() -> None:
     # Trainer
     trainer = L.Trainer(
         max_epochs=args.epochs,
-        callbacks=[checkpoint_cb, early_stop_cb, RichProgressBar(), RichModelSummary()],
+        callbacks=[checkpoint_cb, early_stop_cb],
         precision="bf16-mixed",
         accelerator="auto",
         devices=1,
