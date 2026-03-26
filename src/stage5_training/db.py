@@ -90,15 +90,15 @@ def build_log_entry(
     num_gnn_layers: int,
     hop_distance: int,
     border_distance: int,
-    cell_info_mode: str = "none",
-    lr: float = 1e-4,
-    weight_decay: float,
     batch_size: int,
     max_epochs: int,
     epochs_trained: int | None,
     val_loss: float | None,
     metrics: dict,
     model_path: str,
+    cell_info_mode: str = "none",
+    lr: float = 1e-4,
+    weight_decay: float = 1e-3,
 ) -> dict:
     """Build a dict matching the DB columns."""
     return {

@@ -70,7 +70,6 @@ for COMBO in "${ALL_COMBOS[@]}"; do
             --num-gnn-layers "$NUM_LAYERS" \
             --hop-distance "${BORDER_DISTANCE}" \
             --border-distance "${BORDER_DISTANCE}" \
-            --cell-info-mode "$CELL_INFO_MODE" \
             --batch-size 8 \
             --max-epochs 200 \
             --output-dir experiments \

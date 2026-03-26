@@ -80,8 +80,8 @@ def main() -> None:
             cur = conn.cursor()
             cur.execute(
                 "SELECT COUNT(*) FROM bipartite_experiments "
-                "WHERE fold=%s AND seed=%s AND num_gnn_layers=%s AND hop_distance=%s",
-                (args.test_fold, args.seed, args.num_gnn_layers, args.hop_distance),
+                "WHERE fold=%s AND seed=%s AND num_gnn_layers=%s AND hop_distance=%s AND cell_info_mode=%s",
+                (args.test_fold, args.seed, args.num_gnn_layers, args.hop_distance, args.cell_info_mode),
             )
             if cur.fetchone()[0] > 0:
                 print(f"SKIP: {experiment_name} (already in DB)")
