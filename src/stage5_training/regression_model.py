@@ -76,7 +76,11 @@ class InfiltrationModel(L.LightningModule):
 
     def forward(self, data) -> torch.Tensor:
         """
-        Full forward pass: project → normalize → GNN → head.
+        Full forward pass: [project →] normalize → GNN → head.
+
+        If features are already 256-d (pre-projected in Stage 3), the projector
+        is skipped. If features are 1280-d or 2560-d (raw), the frozen encoder
+        compresses them first.
 
         Args:
             data: PyG Data batch with x, edge_index, batch, patch_classes
@@ -84,8 +88,11 @@ class InfiltrationModel(L.LightningModule):
         Returns:
             (B,) predictions on the 0-4 scale
         """
-        # Project features: 1280 → 256 (frozen)
-        x = self.projector(data.x[:, :1280])
+        x = data.x
+        if x.shape[1] > AUTOENCODER_DIM:
+            # Raw features — project through frozen encoder
+            x = self.projector(x[:, :1280])
+        # else: already 256-d from Stage 3, skip projection
         x = self.input_norm(x)
 
         # GNN message passing + PanNET-only pooling → (B, 256)
