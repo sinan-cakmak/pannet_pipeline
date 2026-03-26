@@ -22,6 +22,8 @@ import argparse
 import pickle
 from pathlib import Path
 
+import json
+
 import h5py
 import numpy as np
 import torch
@@ -31,6 +33,46 @@ from rich.progress import track
 from src.stage2_autoencoder.model import AutoEncoder
 from src.stage3_graph.builder import build_graph
 from src.utils import load_wsi_info
+
+
+def parse_cell_types_v2(h5_file: h5py.File) -> np.ndarray | None:
+    """
+    Parse patch_cell_types_v2 from H5 into a (N, 4) cell_information array.
+
+    Each entry in patch_cell_types_v2 is a JSON string like:
+      {"neoplastic": 41, "inflammatory": 2, "connective": 67, "dead": 0,
+       "macrophage_cell": 0, "macrophage_nuc": 0, "position": [...], "is_complete": true}
+
+    We collapse into 4 dims:
+      [0] = neoplastic count
+      [1] = inflammatory count
+      [2] = other (connective + dead + macrophage_cell + macrophage_nuc)
+      [3] = 0 (reserved)
+
+    Returns None if the dataset doesn't exist.
+    """
+    if "patch_cell_types_v2" not in h5_file:
+        return None
+
+    raw = h5_file["patch_cell_types_v2"][:]
+    n = len(raw)
+    cell_info = np.zeros((n, 4), dtype=np.float32)
+
+    for i, entry in enumerate(raw):
+        if isinstance(entry, bytes):
+            entry = entry.decode("utf-8")
+        d = json.loads(entry)
+        cell_info[i, 0] = d.get("neoplastic", 0)
+        cell_info[i, 1] = d.get("inflammatory", 0)
+        cell_info[i, 2] = (
+            d.get("connective", 0)
+            + d.get("dead", 0)
+            + d.get("macrophage_cell", 0)
+            + d.get("macrophage_nuc", 0)
+        )
+        # cell_info[i, 3] stays 0 (reserved)
+
+    return cell_info
 
 
 def load_encoder(checkpoint_path: str, device: str = "cpu") -> torch.nn.Module:
@@ -97,8 +139,8 @@ def main() -> None:
             tissue_ids = f["tissue_id"][:] if "tissue_id" in f else np.zeros(len(features), dtype=np.int64)
             slide_width = int(f.attrs.get("slide_width", coords[:, 0].max() + 1024))
             slide_height = int(f.attrs.get("slide_height", coords[:, 1].max() + 1024))
-            # Load cell_information if available (from Stage 1.5 HoVer-Net extraction)
-            cell_info = f["cell_information"][:] if "cell_information" in f else None
+            # Parse cell counts from Nusret's patch_cell_types_v2 (JSON strings → numeric array)
+            cell_info = parse_cell_types_v2(f)
 
         # Only use first 1280 dims (VirChow2 output)
         if features.shape[1] > 1280:

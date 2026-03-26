@@ -90,5 +90,9 @@ class GraphDataset(Dataset):
             data.pos = data.pos.float()
         if hasattr(data, "cell_information") and data.cell_information is not None:
             data.cell_information = data.cell_information.float()
+        else:
+            # Always provide cell_information so PyG batching works
+            # (zeros = "no cell data available" — gate learns to pass through)
+            data.cell_information = torch.zeros(data.x.shape[0], 4)
 
         return data
