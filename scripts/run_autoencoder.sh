@@ -18,7 +18,12 @@ set -euo pipefail
 PROJECT_DIR="/scratch/hcakmak20/pannet_pipeline"
 cd "$PROJECT_DIR"
 
-H5_DIR="${H5_DIR:-/scratch/hcakmak20/pannet_pipeline/features}"
+# Load env vars (WSI_FEATURES_DIR etc.)
+if [ -f "$PROJECT_DIR/.env" ]; then
+    export $(grep -v '^#' "$PROJECT_DIR/.env" | grep -v '^$' | xargs)
+fi
+
+H5_DIR="${H5_DIR:-${WSI_FEATURES_DIR:-/userfiles/cgunduz/new_datasets/pannet_dataset/IPS/pannet_wsi_features/40x_1024px_0px_overlap/features_virchow2}}"
 
 mkdir -p "$PROJECT_DIR/logs" "$PROJECT_DIR/checkpoints/autoencoder"
 

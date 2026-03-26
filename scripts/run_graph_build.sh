@@ -19,10 +19,15 @@ set -euo pipefail
 PROJECT_DIR="/scratch/hcakmak20/pannet_pipeline"
 cd "$PROJECT_DIR"
 
+# Load env vars
+if [ -f "$PROJECT_DIR/.env" ]; then
+    export $(grep -v '^#' "$PROJECT_DIR/.env" | grep -v '^$' | xargs)
+fi
+
 CHUNK=${SLURM_ARRAY_TASK_ID:-0}
 NUM_CHUNKS=${NUM_CHUNKS:-8}
 
-H5_DIR="${H5_DIR:-/scratch/hcakmak20/pannet_pipeline/features}"
+H5_DIR="${H5_DIR:-${WSI_FEATURES_DIR:-/userfiles/cgunduz/new_datasets/pannet_dataset/IPS/pannet_wsi_features/40x_1024px_0px_overlap/features_virchow2}}"
 GRAPH_DIR="${GRAPH_DIR:-/scratch/hcakmak20/pannet_pipeline/graphs}"
 AE_CKPT="${AE_CKPT:-checkpoints/autoencoder/best.ckpt}"
 
