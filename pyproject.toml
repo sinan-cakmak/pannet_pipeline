@@ -4,10 +4,10 @@ version = "0.1.0"
 description = "End-to-end bipartite GNN pipeline for PanNET infiltration pattern scoring"
 requires-python = ">=3.12,<3.14"
 dependencies = [
-    # Deep learning
-    "torch>=2.8.0",
-    "torch-geometric>=2.7.0",
-    "lightning>=2.6.1",
+    # Deep learning (torch 2.4.x for CUDA 12.0 compatibility on HPC)
+    "torch>=2.4.0,<2.5",
+    "torch-geometric>=2.6.0",
+    "lightning>=2.4.0",
     # Data
     "h5py>=3.11.0",
     "scipy>=1.14.0",
@@ -42,7 +42,7 @@ build-backend = "hatchling.build"
 
 # PyTorch Geometric: install from PyPI (has CPU wheels).
 # On HPC with CUDA, install PyG CUDA extensions separately:
-#   uv pip install pyg-lib torch-scatter torch-sparse -f https://data.pyg.org/whl/torch-2.8.0+cu129.html
+#   uv pip install pyg-lib torch-scatter torch-sparse -f https://data.pyg.org/whl/torch-2.4.0+cu121.html
 
 # Trident (WSI preprocessing): install separately as editable local package.
 # It uses Poetry and has a strict Python <3.12 constraint that can be ignored.
