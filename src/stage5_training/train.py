@@ -36,6 +36,7 @@ from lightning.pytorch.callbacks import EarlyStopping, ModelCheckpoint
 
 from src.stage2_autoencoder.model import AutoEncoder
 from src.stage5_training.data_module import PanNETDataModule
+from src.stage5_training.db import build_log_entry, log_to_db
 from src.stage5_training.evaluation import aggregate_to_patient_ips, compute_metrics
 from src.stage5_training.models.gin import GINFeatureExtractor
 from src.stage5_training.regression_model import InfiltrationModel
@@ -49,6 +50,8 @@ def main() -> None:
     parser.add_argument("--ae-checkpoint", required=True, help="AutoEncoder checkpoint")
     parser.add_argument("--fold-config", default="data/fold_information.yaml")
     parser.add_argument("--num-gnn-layers", type=int, default=1)
+    parser.add_argument("--hop-distance", type=int, default=3)
+    parser.add_argument("--border-distance", type=int, default=3)
     parser.add_argument("--batch-size", type=int, default=8)
     parser.add_argument("--max-epochs", type=int, default=200)
     parser.add_argument("--lr", type=float, default=1e-4)
@@ -137,7 +140,6 @@ def main() -> None:
     metrics = compute_metrics(y_true_ips, y_pred_ips)
 
     # ---- Report results ----
-    ips_names = {0: "IPS-A", 1: "IPS-B", 2: "IPS-C"}
     print(f"\n{'='*60}")
     print(f"Results: fold={args.test_fold}, seed={args.seed}, layers={args.num_gnn_layers}")
     print(f"{'='*60}")
@@ -150,20 +152,39 @@ def main() -> None:
     print(f"  QWK: {metrics['qwk']:.4f}")
     print(f"{'='*60}")
 
-    # Save results as JSON
-    results_dir = Path(args.output_dir) / "results"
-    results_dir.mkdir(parents=True, exist_ok=True)
-    results_file = results_dir / f"{experiment_name}.json"
+    # ---- Log to PostgreSQL (fallback to JSON) ----
+    best_ckpt = checkpoint_cb.best_model_path or ""
+    best_val_loss = checkpoint_cb.best_model_score
+    best_val_loss = float(best_val_loss) if best_val_loss is not None else None
 
-    results = {
-        "seed": args.seed,
-        "test_fold": args.test_fold,
-        "num_gnn_layers": args.num_gnn_layers,
-        **metrics,
-    }
-    with open(results_file, "w") as f:
-        json.dump(results, f, indent=2)
-    print(f"Results saved to: {results_file}")
+    log_entry = build_log_entry(
+        seed=args.seed,
+        test_fold=args.test_fold,
+        num_gnn_layers=args.num_gnn_layers,
+        hop_distance=args.hop_distance,
+        border_distance=args.border_distance,
+        lr=args.lr,
+        weight_decay=args.weight_decay,
+        batch_size=args.batch_size,
+        max_epochs=args.max_epochs,
+        epochs_trained=trainer.current_epoch,
+        val_loss=best_val_loss,
+        metrics=metrics,
+        model_path=best_ckpt,
+    )
+
+    db_logged = log_to_db(log_entry)
+
+    # Fallback: save as JSON if DB fails
+    if not db_logged:
+        results_dir = Path(args.output_dir) / "results"
+        results_dir.mkdir(parents=True, exist_ok=True)
+        results_file = results_dir / f"{experiment_name}.json"
+        json_data = {k: (str(v) if not isinstance(v, (int, float, str, type(None))) else v)
+                     for k, v in log_entry.items()}
+        with open(results_file, "w") as f:
+            json.dump(json_data, f, indent=2)
+        print(f"[Fallback] Results saved to: {results_file}")
 
 
 if __name__ == "__main__":
