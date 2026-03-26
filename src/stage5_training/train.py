@@ -61,6 +61,7 @@ def main() -> None:
     args = parser.parse_args()
 
     L.seed_everything(args.seed)
+    torch.set_float32_matmul_precision("high")
 
     # ---- Load frozen autoencoder encoder ----
     print(f"Loading autoencoder from: {args.ae_checkpoint}")
