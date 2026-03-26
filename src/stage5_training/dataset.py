@@ -22,17 +22,30 @@ class GraphDataset(Dataset):
     """
     Dataset of pre-built bipartite graphs stored as .pkl files.
 
-    Filters files by a list of allowed case IDs (for train/val/test splitting).
+    Filters files by:
+      - hop_distance and border_distance (from filename pattern)
+      - case_ids (for train/val/test fold splitting)
 
     Args:
         graph_dir: Directory containing .pkl graph files
         case_ids: List of case IDs to include (for fold-based splitting)
+        hop_distance: Only load graphs with this hop distance (default: 3)
+        border_distance: Only load graphs with this border distance (default: 3)
     """
 
-    def __init__(self, graph_dir: str | Path, case_ids: list[int] | None = None):
+    def __init__(
+        self,
+        graph_dir: str | Path,
+        case_ids: list[int] | None = None,
+        hop_distance: int = 3,
+        border_distance: int = 3,
+    ):
         super().__init__()
         graph_dir = Path(graph_dir)
-        all_files = sorted(graph_dir.glob("*.pkl"))
+
+        # Filter by hop/border distance from filename pattern
+        pattern = f"*_hop_{hop_distance}_border_{border_distance}.pkl"
+        all_files = sorted(graph_dir.glob(pattern))
 
         # Filter to specified case IDs if provided
         if case_ids is not None:

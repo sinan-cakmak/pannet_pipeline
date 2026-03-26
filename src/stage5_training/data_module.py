@@ -39,6 +39,8 @@ class PanNETDataModule(L.LightningDataModule):
         graph_dir: str | Path,
         fold_config_path: str | Path = "data/fold_information.yaml",
         test_fold: int = 0,
+        hop_distance: int = 3,
+        border_distance: int = 3,
         batch_size: int = 8,
         num_workers: int = 4,
     ):
@@ -46,6 +48,8 @@ class PanNETDataModule(L.LightningDataModule):
         self.graph_dir = graph_dir
         self.fold_config_path = fold_config_path
         self.test_fold = test_fold
+        self.hop_distance = hop_distance
+        self.border_distance = border_distance
         self.batch_size = batch_size
         self.num_workers = num_workers
 
@@ -82,10 +86,11 @@ class PanNETDataModule(L.LightningDataModule):
         print(f"Fold {self.test_fold}: test={len(test_ids)} patients, "
               f"val={len(val_ids)} patients, train={len(train_ids)} patients")
 
-        # Create datasets filtered by patient IDs
-        self.train_dataset = GraphDataset(self.graph_dir, case_ids=train_ids)
-        self.val_dataset = GraphDataset(self.graph_dir, case_ids=val_ids)
-        self.test_dataset = GraphDataset(self.graph_dir, case_ids=test_ids)
+        # Create datasets filtered by patient IDs AND hop/border distance
+        ds_kwargs = dict(hop_distance=self.hop_distance, border_distance=self.border_distance)
+        self.train_dataset = GraphDataset(self.graph_dir, case_ids=train_ids, **ds_kwargs)
+        self.val_dataset = GraphDataset(self.graph_dir, case_ids=val_ids, **ds_kwargs)
+        self.test_dataset = GraphDataset(self.graph_dir, case_ids=test_ids, **ds_kwargs)
 
         print(f"  Train graphs: {len(self.train_dataset)}, "
               f"Val graphs: {len(self.val_dataset)}, "

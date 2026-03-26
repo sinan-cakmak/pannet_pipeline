@@ -86,6 +86,8 @@ def main() -> None:
         graph_dir=args.graph_dir,
         fold_config_path=args.fold_config,
         test_fold=args.test_fold,
+        hop_distance=args.hop_distance,
+        border_distance=args.border_distance,
         batch_size=args.batch_size,
     )
 
