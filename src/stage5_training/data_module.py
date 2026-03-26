@@ -15,7 +15,8 @@ from collections import Counter
 from pathlib import Path
 
 import lightning as L
-from torch.utils.data import DataLoader, WeightedRandomSampler
+from torch.utils.data import WeightedRandomSampler
+from torch_geometric.loader import DataLoader
 
 from src.stage5_training.dataset import GraphDataset
 from src.utils import load_fold_config
