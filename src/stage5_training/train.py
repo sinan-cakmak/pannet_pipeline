@@ -92,17 +92,16 @@ def main() -> None:
     experiment_name = f"gin_{args.num_gnn_layers}layer_fold{args.test_fold}_seed{args.seed}"
     checkpoint_dir = Path(args.output_dir) / "checkpoints" / experiment_name
 
+    checkpoint_cb = ModelCheckpoint(
+        dirpath=str(checkpoint_dir),
+        filename="best-{epoch:02d}-{val_loss:.4f}",
+        monitor="val_loss",
+        mode="min",
+        save_top_k=1,
+    )
     callbacks = [
-        # Stop training if val_loss doesn't improve for 15 epochs
         EarlyStopping(monitor="val_loss", patience=15, min_delta=0.01, mode="min"),
-        # Save only the best model (lowest val_loss)
-        ModelCheckpoint(
-            dirpath=str(checkpoint_dir),
-            filename="best-{epoch:02d}-{val_loss:.4f}",
-            monitor="val_loss",
-            mode="min",
-            save_top_k=1,
-        ),
+        checkpoint_cb,
     ]
 
     # ---- Train ----
