@@ -38,6 +38,7 @@ from src.stage2_autoencoder.model import AutoEncoder
 from src.stage5_training.data_module import PanNETDataModule
 from src.stage5_training.db import build_log_entry, log_to_db
 from src.stage5_training.evaluation import aggregate_to_patient_ips, compute_metrics
+from src.stage5_training.models.cell_gin import CellConditionedGIN
 from src.stage5_training.models.gin import GINFeatureExtractor
 from src.stage5_training.regression_model import InfiltrationModel
 
@@ -52,6 +53,8 @@ def main() -> None:
     parser.add_argument("--num-gnn-layers", type=int, default=1)
     parser.add_argument("--hop-distance", type=int, default=3)
     parser.add_argument("--border-distance", type=int, default=3)
+    parser.add_argument("--cell-info-mode", default="none", choices=["none", "concat", "gate"],
+                        help="How to use cell_information: none=ignore, concat=append, gate=cell-conditioned conv")
     parser.add_argument("--batch-size", type=int, default=8)
     parser.add_argument("--max-epochs", type=int, default=200)
     parser.add_argument("--lr", type=float, default=1e-4)
@@ -64,7 +67,7 @@ def main() -> None:
 
     # ---- Skip if already run ----
     if args.skip_existing:
-        experiment_name = f"gin_{args.num_gnn_layers}layer_fold{args.test_fold}_seed{args.seed}"
+        experiment_name = f"gin_{args.num_gnn_layers}layer_{args.cell_info_mode}_fold{args.test_fold}_seed{args.seed}"
         json_path = Path(args.output_dir) / "results" / f"{experiment_name}.json"
         if json_path.exists():
             print(f"SKIP: {experiment_name} (JSON exists)")
@@ -103,12 +106,17 @@ def main() -> None:
         p.requires_grad = False
 
     # ---- Create model ----
-    feature_extractor = GINFeatureExtractor(num_layers=args.num_gnn_layers)
+    if args.cell_info_mode == "gate":
+        feature_extractor = CellConditionedGIN(num_layers=args.num_gnn_layers)
+    else:
+        feature_extractor = GINFeatureExtractor(num_layers=args.num_gnn_layers)
+
     model = InfiltrationModel(
         projector=projector,
         feature_extractor=feature_extractor,
         lr=args.lr,
         weight_decay=args.weight_decay,
+        cell_info_mode=args.cell_info_mode,
     )
 
     # ---- Data ----
@@ -122,7 +130,7 @@ def main() -> None:
     )
 
     # ---- Callbacks ----
-    experiment_name = f"gin_{args.num_gnn_layers}layer_fold{args.test_fold}_seed{args.seed}"
+    experiment_name = f"gin_{args.num_gnn_layers}layer_{args.cell_info_mode}_fold{args.test_fold}_seed{args.seed}"
     checkpoint_dir = Path(args.output_dir) / "checkpoints" / experiment_name
 
     checkpoint_cb = ModelCheckpoint(
@@ -196,6 +204,7 @@ def main() -> None:
         num_gnn_layers=args.num_gnn_layers,
         hop_distance=args.hop_distance,
         border_distance=args.border_distance,
+        cell_info_mode=args.cell_info_mode,
         lr=args.lr,
         weight_decay=args.weight_decay,
         batch_size=args.batch_size,

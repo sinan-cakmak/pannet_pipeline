@@ -88,5 +88,7 @@ class GraphDataset(Dataset):
             data.patch_classes = torch.as_tensor(data.patch_classes).long()
         if hasattr(data, "pos"):
             data.pos = data.pos.float()
+        if hasattr(data, "cell_information") and data.cell_information is not None:
+            data.cell_information = data.cell_information.float()
 
         return data

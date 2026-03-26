@@ -33,6 +33,7 @@ if [ -z "$AE_CKPT" ]; then echo "ERROR: No autoencoder checkpoint found"; exit 1
 echo "Using AE checkpoint: $AE_CKPT"
 NUM_LAYERS="${NUM_LAYERS:-1}"
 BORDER_DISTANCE="${BORDER_DISTANCE:-3}"
+CELL_INFO_MODE="${CELL_INFO_MODE:-none}"
 
 CHUNK=${SLURM_ARRAY_TASK_ID:-0}
 NUM_CHUNKS=8
@@ -69,6 +70,7 @@ for COMBO in "${ALL_COMBOS[@]}"; do
             --num-gnn-layers "$NUM_LAYERS" \
             --hop-distance "${BORDER_DISTANCE}" \
             --border-distance "${BORDER_DISTANCE}" \
+            --cell-info-mode "$CELL_INFO_MODE" \
             --batch-size 8 \
             --max-epochs 200 \
             --output-dir experiments \

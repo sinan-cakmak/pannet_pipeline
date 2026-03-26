@@ -97,6 +97,8 @@ def main() -> None:
             tissue_ids = f["tissue_id"][:] if "tissue_id" in f else np.zeros(len(features), dtype=np.int64)
             slide_width = int(f.attrs.get("slide_width", coords[:, 0].max() + 1024))
             slide_height = int(f.attrs.get("slide_height", coords[:, 1].max() + 1024))
+            # Load cell_information if available (from Stage 1.5 HoVer-Net extraction)
+            cell_info = f["cell_information"][:] if "cell_information" in f else None
 
         # Only use first 1280 dims (VirChow2 output)
         if features.shape[1] > 1280:
@@ -110,6 +112,7 @@ def main() -> None:
         t_locs = coords[tissue_mask]
         t_classes = patch_classes[tissue_mask]
         t_feats = features[tissue_mask]
+        t_cell_info = cell_info[tissue_mask] if cell_info is not None else None
 
         # Build graph
         data = build_graph(
@@ -124,6 +127,7 @@ def main() -> None:
             border_distance=args.border_distance,
             encoder=encoder,
             device=args.device,
+            cell_information=t_cell_info,
         )
 
         if data is None:

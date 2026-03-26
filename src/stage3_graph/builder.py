@@ -40,6 +40,7 @@ def build_graph(
     border_distance: int = 3,
     encoder: nn.Module | None = None,
     device: str = "cpu",
+    cell_information: np.ndarray | None = None,
 ) -> Data | None:
     """
     Build a bipartite graph for one tissue region of one WSI.
@@ -56,6 +57,7 @@ def build_graph(
         border_distance: How many hops of NNP neighbors to include
         encoder: Frozen autoencoder encoder (1280 → 256). If None, raw features used.
         device: Torch device for computation
+        cell_information: (N, 4) cell counts per patch, or None if not available
 
     Returns:
         PyG Data object, or None if the tissue has no valid PanNET border patches.
@@ -70,10 +72,16 @@ def build_graph(
     patch_locs, patch_classes, patch_feats = fill_pannet_holes(
         slide_width, slide_height, patch_locs, patch_classes, patch_feats,
     )
+    # Extend cell_information to match (new hole-fill patches get zero counts)
+    if cell_information is not None:
+        n_new = len(patch_locs) - len(cell_information)
+        if n_new > 0:
+            cell_information = np.concatenate([
+                cell_information,
+                np.zeros((n_new, cell_information.shape[1]), dtype=cell_information.dtype),
+            ])
 
     # ---- Step 3: Find border patches + nearby NNP ----
-    # Border PanNET = tumor patches with at least one non-tumor 8-neighbor.
-    # Also include NNP patches within border_distance hops of the border.
     border_indices, border_distances_arr, nnp_indices = find_border_pannets(
         patch_locs, patch_classes, include_neighbour=border_distance, device=device,
     )
@@ -82,11 +90,9 @@ def build_graph(
         return None
 
     # ---- Step 4: Keep only border-relevant patches ----
-    # Merge border PanNET indices + NNP neighbor indices
     keep_indices = np.union1d(border_indices, nnp_indices)
 
-    # Remove zero-feature filler patches (from hole filling) — they were only
-    # needed to detect borders correctly but shouldn't be graph nodes.
+    # Remove zero-feature filler patches (from hole filling)
     nonzero_mask = np.any(patch_feats[keep_indices] != 0, axis=1)
     keep_indices = keep_indices[nonzero_mask]
 
@@ -98,6 +104,7 @@ def build_graph(
     sub_classes = patch_classes[keep_indices]
     sub_feats = patch_feats[keep_indices]
     sub_border_dist = border_distances_arr[keep_indices]
+    sub_cell_info = cell_information[keep_indices] if cell_information is not None else None
 
     # ---- Step 5: Build bipartite edges ----
     edge_index = build_bipartite_edges(sub_locs, sub_classes, hop_distance, device)
@@ -106,8 +113,6 @@ def build_graph(
         return None
 
     # ---- Step 6: Filter connected components ----
-    # Remove small disconnected clusters — they lack sufficient context for
-    # meaningful message passing. Minimum size scales with hop_distance.
     min_size = sum(NEIGHBOR_CONNECTIVITY * i for i in range(1, hop_distance + 1))
     keep_nodes = _filter_components(edge_index, len(sub_locs), min_size)
 
@@ -118,6 +123,8 @@ def build_graph(
     sub_locs, sub_classes, sub_feats, sub_border_dist, edge_index = _reindex(
         sub_locs, sub_classes, sub_feats, sub_border_dist, edge_index, keep_nodes,
     )
+    if sub_cell_info is not None:
+        sub_cell_info = sub_cell_info[keep_nodes]
 
     # ---- Step 7: Project features through encoder ----
     features_t = torch.tensor(sub_feats, dtype=torch.float32)
@@ -137,6 +144,10 @@ def build_graph(
         slide_width=slide_width,
         slide_height=slide_height,
     )
+
+    # Attach cell_information if available
+    if sub_cell_info is not None:
+        data.cell_information = torch.tensor(sub_cell_info, dtype=torch.float32)
 
     # Compute and attach edge distances
     data.edge_distances = compute_edge_distances(data)

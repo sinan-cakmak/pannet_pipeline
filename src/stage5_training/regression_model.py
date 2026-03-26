@@ -45,9 +45,11 @@ class InfiltrationModel(L.LightningModule):
         feature_extractor: nn.Module,
         lr: float = 1e-4,
         weight_decay: float = 1e-3,
+        cell_info_mode: str = "none",
     ):
         super().__init__()
         self.save_hyperparameters(ignore=["projector", "feature_extractor"])
+        self.cell_info_mode = cell_info_mode
 
         # Frozen projector: compresses 1280-d VirChow2 → 256-d
         self.projector = projector
@@ -55,7 +57,14 @@ class InfiltrationModel(L.LightningModule):
             param.requires_grad = False
 
         # Input normalization after projection
-        self.input_norm = nn.RMSNorm(AUTOENCODER_DIM)
+        # For "concat" mode, input is 256 + 4 = 260, need separate projection back to 256
+        if cell_info_mode == "concat":
+            self.input_norm = nn.Sequential(
+                nn.Linear(AUTOENCODER_DIM + 4, AUTOENCODER_DIM),
+                nn.RMSNorm(AUTOENCODER_DIM),
+            )
+        else:
+            self.input_norm = nn.RMSNorm(AUTOENCODER_DIM)
 
         # GNN feature extractor (trainable)
         self.feature_extractor = feature_extractor
@@ -78,25 +87,40 @@ class InfiltrationModel(L.LightningModule):
         """
         Full forward pass: [project →] normalize → GNN → head.
 
-        If features are already 256-d (pre-projected in Stage 3), the projector
-        is skipped. If features are 1280-d or 2560-d (raw), the frozen encoder
-        compresses them first.
+        Supports three cell_info_mode options:
+          - "none": standard GIN, cell_information ignored
+          - "concat": cell_information concatenated to features before GNN
+          - "gate": CellConditionedGIN, cell_information gates message passing
 
         Args:
-            data: PyG Data batch with x, edge_index, batch, patch_classes
+            data: PyG Data batch with x, edge_index, batch, patch_classes,
+                  and optionally cell_information
 
         Returns:
             (B,) predictions on the 0-4 scale
         """
         x = data.x
         if x.shape[1] > AUTOENCODER_DIM:
-            # Raw features — project through frozen encoder
             x = self.projector(x[:, :1280])
-        # else: already 256-d from Stage 3, skip projection
+
+        # Handle cell_info_mode
+        if self.cell_info_mode == "concat":
+            cell_info = getattr(data, "cell_information", None)
+            if cell_info is not None:
+                x = torch.cat([x, cell_info], dim=-1)  # (N, 260)
+            else:
+                x = torch.cat([x, torch.zeros(x.shape[0], 4, device=x.device)], dim=-1)
+
         x = self.input_norm(x)
 
         # GNN message passing + PanNET-only pooling → (B, 256)
-        h = self.feature_extractor(x, data.edge_index, data.batch, data.patch_classes)
+        if self.cell_info_mode == "gate":
+            cell_info = getattr(data, "cell_information", None)
+            if cell_info is None:
+                cell_info = torch.zeros(x.shape[0], 4, device=x.device)
+            h = self.feature_extractor(x, data.edge_index, data.batch, data.patch_classes, cell_info)
+        else:
+            h = self.feature_extractor(x, data.edge_index, data.batch, data.patch_classes)
 
         # Regression → single scalar per graph
         pred = self.head(h).squeeze(-1)  # (B,)
