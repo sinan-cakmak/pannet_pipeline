@@ -32,13 +32,11 @@ Usage:
 from __future__ import annotations
 
 import argparse
-import sys
 from pathlib import Path
 
 import h5py
 import numpy as np
 import torch
-import torch.nn.functional as F
 from tqdm import tqdm
 
 from src.constants import PATCH_SIZE
@@ -48,19 +46,14 @@ def load_hovernet(device: str = "cuda") -> torch.nn.Module:
     """
     Load HoVer-Net model pre-trained on PanNuke dataset.
 
-    Uses a workaround from Nusret's code: extract the .model from
-    NucleusInstanceSegmentor since its predict() is unreliable, and
-    call infer_batch() + postproc() directly.
+    Uses get_pretrained_model() to load the model directly (bypasses the
+    NucleusInstanceSegmentor engine which is deprecated and unreliable).
+    We call infer_batch() + postproc() on the model ourselves.
     """
-    from tiatoolbox.models.engine.nucleus_instance_segmentor import NucleusInstanceSegmentor
+    from tiatoolbox.models.architecture import get_pretrained_model
 
-    segmentor = NucleusInstanceSegmentor(
-        pretrained_model="hovernet_fast-pannuke",
-        num_loader_workers=2,
-        num_postproc_workers=2,
-        batch_size=4,
-    )
-    model = segmentor.model.to(device)
+    model, _ioconfig = get_pretrained_model(pretrained_model="hovernet_fast-pannuke")
+    model = model.to(device)
     model.eval()
     return model
 
@@ -84,20 +77,6 @@ def load_stain_normalizer(reference_image_path: str | None = None):
     return normalizer
 
 
-def prep_patch_for_hovernet(img_np: np.ndarray) -> torch.Tensor:
-    """
-    Prepare a 1024×1024 RGB patch for HoVer-Net inference.
-
-    HoVer-Net expects padded input (48px reflect padding on each side)
-    to handle nuclei at patch borders. Input format: (1, H+96, W+96, 3).
-    """
-    x = torch.from_numpy(img_np)                          # (H, W, 3)
-    x = x.permute(2, 0, 1)                                # (3, H, W)
-    x = F.pad(x, (48, 48, 48, 48), mode="reflect")        # (3, H+96, W+96)
-    x = x.permute(1, 2, 0).unsqueeze(0)                   # (1, H+96, W+96, 3)
-    return x
-
-
 def count_cells_in_patch(
     model: torch.nn.Module,
     img_np: np.ndarray,
@@ -115,31 +94,34 @@ def count_cells_in_patch(
       4 = Dead
       5 = Non-neoplastic epithelial
     """
-    x = prep_patch_for_hovernet(img_np)
+    # HoVer-Net expects NHWC uint8 input; infer_batch handles normalization + NCHW conversion
+    batch = torch.from_numpy(img_np).unsqueeze(0)  # (1, H, W, 3)
 
-    # Run HoVer-Net inference
-    # Returns: np_map (nuclei probability), hv (horizontal/vertical gradients), tp (type prediction)
-    np_map, hv, tp = model.infer_batch(model, x, device)
+    # Run HoVer-Net inference (device is keyword-only)
+    # Returns: np_map (nuclei prob), hv (horizontal/vertical gradients), tp (type prediction)
+    np_map, hv, tp = model.infer_batch(model, batch, device=device)
 
-    # Remove padding artifacts (48px was added on each side, but output has 2px border effect)
-    np_map = np_map[0][2:-2, 2:-2]
-    hv = hv[0][2:-2, 2:-2]
-    tp = tp[0][2:-2, 2:-2]
+    # Extract first (only) sample from batch
+    output = [np_map[0], hv[0], tp[0]]
 
     # Post-process: instance segmentation + cell type assignment
-    # Returns: (instance_map, instance_info_dict)
-    # instance_info_dict: {id: {"centroid": (x,y), "type": int, "contour": [...], ...}}
-    _, maps = model.postproc([np_map, hv, tp])
+    # Returns: (nuclei_seg_dict,) — a 1-element tuple
+    result = model.postproc(output)
+    info_dict = result[0]["info_dict"]
 
     # Count cells by type
     counts = np.zeros(4, dtype=np.int64)
-    for nucleus_info in maps.values():
-        cell_type = nucleus_info["type"]
+    if isinstance(info_dict, dict) and "type" in info_dict:
+        # Empty case: info_dict has flat arrays when no nuclei found
+        return counts
+
+    for nucleus_info in info_dict.values():
+        cell_type = nucleus_info.get("type", 0)
         if cell_type == 1:
             counts[0] += 1  # Neoplastic (tumor)
         elif cell_type == 2:
             counts[1] += 1  # Inflammatory (immune)
-        else:
+        elif cell_type >= 3:
             counts[2] += 1  # Other (connective + dead + epithelial)
     # counts[3] stays 0 (reserved flag)
 
