@@ -58,7 +58,37 @@ def main() -> None:
     parser.add_argument("--weight-decay", type=float, default=1e-3)
     parser.add_argument("--device", default="auto")
     parser.add_argument("--output-dir", default="experiments")
+    parser.add_argument("--skip-existing", action="store_true",
+                        help="Skip if this (fold, seed, layers, hop) combo already has results")
     args = parser.parse_args()
+
+    # ---- Skip if already run ----
+    if args.skip_existing:
+        experiment_name = f"gin_{args.num_gnn_layers}layer_fold{args.test_fold}_seed{args.seed}"
+        json_path = Path(args.output_dir) / "results" / f"{experiment_name}.json"
+        if json_path.exists():
+            print(f"SKIP: {experiment_name} (JSON exists)")
+            return
+        # Also check DB
+        try:
+            import psycopg2
+            from src.stage5_training.db import CONN_STRING
+            conn = psycopg2.connect(CONN_STRING)
+            cur = conn.cursor()
+            cur.execute(
+                "SELECT COUNT(*) FROM bipartite_experiments "
+                "WHERE fold=%s AND seed=%s AND num_gnn_layers=%s AND hop_distance=%s",
+                (args.test_fold, args.seed, args.num_gnn_layers, args.hop_distance),
+            )
+            if cur.fetchone()[0] > 0:
+                print(f"SKIP: {experiment_name} (already in DB)")
+                cur.close()
+                conn.close()
+                return
+            cur.close()
+            conn.close()
+        except Exception:
+            pass  # DB unreachable, fall through to JSON check only
 
     L.seed_everything(args.seed)
     torch.set_float32_matmul_precision("high")

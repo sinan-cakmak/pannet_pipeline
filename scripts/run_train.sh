@@ -67,9 +67,12 @@ for COMBO in "${ALL_COMBOS[@]}"; do
             --graph-dir "$GRAPH_DIR" \
             --ae-checkpoint "$AE_CKPT" \
             --num-gnn-layers "$NUM_LAYERS" \
+            --hop-distance "${BORDER_DISTANCE}" \
+            --border-distance "${BORDER_DISTANCE}" \
             --batch-size 8 \
             --max-epochs 200 \
-            --output-dir experiments
+            --output-dir experiments \
+            --skip-existing
     fi
     IDX=$((IDX + 1))
 done
