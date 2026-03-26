@@ -145,6 +145,7 @@ def main() -> None:
         accelerator=args.device,
         devices=1,
         log_every_n_steps=1,
+        logger=False,  # We log to PostgreSQL, not CSV
     )
 
     trainer.fit(model, datamodule=data_module)
