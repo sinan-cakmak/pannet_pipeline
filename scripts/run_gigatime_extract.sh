@@ -12,6 +12,11 @@
 
 # =============================================================================
 # STAGE 1.5g: Extract virtual protein counts per patch using GigaTIME (8 GPUs)
+#
+# IMPORTANT: Download the model ONCE on the login node before submitting:
+#   cd /scratch/hcakmak20/pannet_pipeline
+#   source .env
+#   uv run python -c "from huggingface_hub import snapshot_download; snapshot_download('prov-gigatime/GigaTIME')"
 # =============================================================================
 
 set -euo pipefail

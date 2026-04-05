@@ -61,8 +61,9 @@ def load_gigatime(device: str = "cuda") -> torch.nn.Module:
 
     model = GigaTIME(num_classes=23, input_channels=3)
 
-    # Download weights from HuggingFace
-    local_dir = snapshot_download(repo_id="prov-gigatime/GigaTIME")
+    # Download weights from HuggingFace (token required for gated repo)
+    token = os.environ.get("HF_TOKEN")
+    local_dir = snapshot_download(repo_id="prov-gigatime/GigaTIME", token=token)
     weights_path = os.path.join(local_dir, "model.pth")
 
     state_dict = torch.load(weights_path, map_location="cpu")
