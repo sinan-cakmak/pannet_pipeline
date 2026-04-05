@@ -125,6 +125,7 @@ src/
 - Fallback: JSON files in `experiments/results/`
 - Migration script: `scripts/migrate_json_to_db.py`
 - **Important:** Metrics must be plain `float()`, not `np.float64` (PostgreSQL rejects numpy types)
+- **Experiment identity columns:** The DB skip check (`--skip-existing`) and experiment naming use these columns to uniquely identify a run: `fold, seed, num_gnn_layers, hop_distance, cell_info_mode, cell_info_dim, log_normalize`. When adding a new experimental parameter, you MUST: (1) add the column to `CREATE_TABLE_SQL`, (2) add it to `INSERT_SQL`, (3) add it to `build_log_entry()`, (4) add it to the skip check query in `train.py`, (5) add it to the experiment name string, (6) add an env var in `run_train.sh`, and (7) run `ALTER TABLE` on the live DB.
 
 ## Data
 

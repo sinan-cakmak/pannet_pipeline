@@ -87,9 +87,9 @@ def main() -> None:
             cur.execute(
                 "SELECT COUNT(*) FROM bipartite_experiments "
                 "WHERE fold=%s AND seed=%s AND num_gnn_layers=%s AND hop_distance=%s "
-                "AND cell_info_mode=%s AND cell_info_dim=%s",
+                "AND cell_info_mode=%s AND cell_info_dim=%s AND log_normalize=%s",
                 (args.test_fold, args.seed, args.num_gnn_layers, args.hop_distance,
-                 args.cell_info_mode, args.cell_info_dim),
+                 args.cell_info_mode, args.cell_info_dim, args.log_normalize),
             )
             if cur.fetchone()[0] > 0:
                 print(f"SKIP: {experiment_name} (already in DB)")
@@ -220,6 +220,7 @@ def main() -> None:
         border_distance=args.border_distance,
         cell_info_mode=args.cell_info_mode,
         cell_info_dim=args.cell_info_dim,
+        log_normalize=args.log_normalize,
         lr=args.lr,
         weight_decay=args.weight_decay,
         batch_size=args.batch_size,

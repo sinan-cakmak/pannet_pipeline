@@ -28,6 +28,7 @@ CREATE TABLE IF NOT EXISTS bipartite_experiments (
     border_distance SMALLINT NOT NULL,
     cell_info_mode TEXT DEFAULT 'none',
     cell_info_dim SMALLINT DEFAULT 4,
+    log_normalize BOOLEAN DEFAULT FALSE,
     lr REAL NOT NULL,
     weight_decay REAL NOT NULL,
     batch_size SMALLINT NOT NULL,
@@ -48,14 +49,14 @@ CREATE TABLE IF NOT EXISTS bipartite_experiments (
 INSERT_SQL = """
 INSERT INTO bipartite_experiments (
     run_id, timestamp, fold, seed, num_gnn_layers,
-    hop_distance, border_distance, cell_info_mode, cell_info_dim, lr, weight_decay,
-    batch_size, max_epochs, epochs_trained, val_loss,
+    hop_distance, border_distance, cell_info_mode, cell_info_dim, log_normalize,
+    lr, weight_decay, batch_size, max_epochs, epochs_trained, val_loss,
     f1_ips_a, f1_ips_b, f1_ips_c, f1_macro, f1_weighted,
     qwk, num_test_patients, model_path
 ) VALUES (
     %(run_id)s, %(timestamp)s, %(fold)s, %(seed)s, %(num_gnn_layers)s,
-    %(hop_distance)s, %(border_distance)s, %(cell_info_mode)s, %(cell_info_dim)s, %(lr)s, %(weight_decay)s,
-    %(batch_size)s, %(max_epochs)s, %(epochs_trained)s, %(val_loss)s,
+    %(hop_distance)s, %(border_distance)s, %(cell_info_mode)s, %(cell_info_dim)s, %(log_normalize)s,
+    %(lr)s, %(weight_decay)s, %(batch_size)s, %(max_epochs)s, %(epochs_trained)s, %(val_loss)s,
     %(f1_ips_a)s, %(f1_ips_b)s, %(f1_ips_c)s, %(f1_macro)s, %(f1_weighted)s,
     %(qwk)s, %(num_test_patients)s, %(model_path)s
 )
@@ -99,6 +100,7 @@ def build_log_entry(
     model_path: str,
     cell_info_mode: str = "none",
     cell_info_dim: int = 4,
+    log_normalize: bool = False,
     lr: float = 1e-4,
     weight_decay: float = 1e-3,
 ) -> dict:
@@ -113,6 +115,7 @@ def build_log_entry(
         "border_distance": border_distance,
         "cell_info_mode": cell_info_mode,
         "cell_info_dim": cell_info_dim,
+        "log_normalize": log_normalize,
         "lr": lr,
         "weight_decay": weight_decay,
         "batch_size": batch_size,
