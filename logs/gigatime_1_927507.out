@@ -1,0 +1,5 @@
+=== Chunk 1/8: Extracting GigaTIME protein counts ===
+Chunk 1/8: processing 32/252 H5 files
+Loading GigaTIME model from HuggingFace...
+GigaTIME model loaded.
+Processing: #1-2 7817B8509.h5
