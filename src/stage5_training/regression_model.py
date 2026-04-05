@@ -47,11 +47,13 @@ class InfiltrationModel(L.LightningModule):
         weight_decay: float = 1e-3,
         cell_info_mode: str = "none",
         cell_info_dim: int = 4,
+        log_normalize_cell_info: bool = False,
     ):
         super().__init__()
         self.save_hyperparameters(ignore=["projector", "feature_extractor"])
         self.cell_info_mode = cell_info_mode
         self.cell_info_dim = cell_info_dim
+        self.log_normalize_cell_info = log_normalize_cell_info
 
         # Frozen projector: compresses 1280-d VirChow2 → 256-d
         self.projector = projector
@@ -108,10 +110,11 @@ class InfiltrationModel(L.LightningModule):
         # Handle cell_info_mode
         if self.cell_info_mode == "concat":
             cell_info = getattr(data, "cell_information", None)
-            if cell_info is not None:
-                x = torch.cat([x, cell_info], dim=-1)  # (N, 260)
-            else:
-                x = torch.cat([x, torch.zeros(x.shape[0], self.cell_info_dim, device=x.device)], dim=-1)
+            if cell_info is None:
+                cell_info = torch.zeros(x.shape[0], self.cell_info_dim, device=x.device)
+            if self.log_normalize_cell_info:
+                cell_info = torch.log1p(cell_info)
+            x = torch.cat([x, cell_info], dim=-1)
 
         x = self.input_norm(x)
 
@@ -120,6 +123,8 @@ class InfiltrationModel(L.LightningModule):
             cell_info = getattr(data, "cell_information", None)
             if cell_info is None:
                 cell_info = torch.zeros(x.shape[0], self.cell_info_dim, device=x.device)
+            if self.log_normalize_cell_info:
+                cell_info = torch.log1p(cell_info)
             h = self.feature_extractor(x, data.edge_index, data.batch, data.patch_classes, cell_info)
         else:
             h = self.feature_extractor(x, data.edge_index, data.batch, data.patch_classes)

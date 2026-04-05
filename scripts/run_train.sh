@@ -35,6 +35,7 @@ NUM_LAYERS="${NUM_LAYERS:-1}"
 BORDER_DISTANCE="${BORDER_DISTANCE:-3}"
 CELL_INFO_MODE="${CELL_INFO_MODE:-none}"
 CELL_INFO_DIM="${CELL_INFO_DIM:-4}"
+LOG_NORMALIZE="${LOG_NORMALIZE:-}"
 
 CHUNK=${SLURM_ARRAY_TASK_ID:-0}
 NUM_CHUNKS=8
@@ -75,6 +76,7 @@ for COMBO in "${ALL_COMBOS[@]}"; do
             --max-epochs 200 \
             --cell-info-mode "$CELL_INFO_MODE" \
             --cell-info-dim "$CELL_INFO_DIM" \
+            ${LOG_NORMALIZE:+--log-normalize} \
             --output-dir experiments \
             --skip-existing
     fi

@@ -192,6 +192,10 @@ s1-s4 rotate test/val, s5 always train. Patient IDs (case numbers) per split.
 - **Graphs already contain 256-d features** (projected in Stage 3). The regression model auto-detects: if `x.shape[1] > 256`, applies projector; otherwise skips it.
 - **psycopg2 requires plain `float()`**, not `np.float64`. All metrics in evaluation.py are cast to float.
 
+## Experiment Tracking
+
+All experiment iterations with their methodology and results must be documented in `docs/experiment_log.md`. Update this file after every training run with: trial name, what changed, why, results, and takeaways. This ensures reproducibility and prevents re-running failed approaches.
+
 ## Future Work
 
 - **Cell information gating:** Extract cell counts per patch via HoVer-Net (tiatoolbox), add CellConditionedConv that gates message passing based on cell composition of source/target patches. This combines Nusret's bipartite approach with cell-level information from Koc et al. 2025.

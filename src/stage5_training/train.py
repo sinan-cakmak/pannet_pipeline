@@ -57,6 +57,8 @@ def main() -> None:
                         help="How to use cell_information: none=ignore, concat=append, gate=cell-conditioned conv")
     parser.add_argument("--cell-info-dim", type=int, default=4,
                         help="Dimension of cell_information vector (4=HoVer-Net, 21=GigaTIME)")
+    parser.add_argument("--log-normalize", action="store_true",
+                        help="Apply log1p normalization to cell_information before gate/concat")
     parser.add_argument("--batch-size", type=int, default=8)
     parser.add_argument("--max-epochs", type=int, default=200)
     parser.add_argument("--lr", type=float, default=1e-4)
@@ -70,7 +72,8 @@ def main() -> None:
     # ---- Skip if already run ----
     if args.skip_existing:
         dim_suffix = f"_{args.cell_info_dim}d" if args.cell_info_mode != "none" else ""
-        experiment_name = f"gin_{args.num_gnn_layers}layer_{args.cell_info_mode}{dim_suffix}_fold{args.test_fold}_seed{args.seed}"
+        log_suffix = "_log" if args.log_normalize else ""
+        experiment_name = f"gin_{args.num_gnn_layers}layer_{args.cell_info_mode}{dim_suffix}{log_suffix}_fold{args.test_fold}_seed{args.seed}"
         json_path = Path(args.output_dir) / "results" / f"{experiment_name}.json"
         if json_path.exists():
             print(f"SKIP: {experiment_name} (JSON exists)")
@@ -126,6 +129,7 @@ def main() -> None:
         weight_decay=args.weight_decay,
         cell_info_mode=args.cell_info_mode,
         cell_info_dim=args.cell_info_dim,
+        log_normalize_cell_info=args.log_normalize,
     )
 
     # ---- Data ----
