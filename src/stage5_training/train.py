@@ -69,7 +69,8 @@ def main() -> None:
 
     # ---- Skip if already run ----
     if args.skip_existing:
-        experiment_name = f"gin_{args.num_gnn_layers}layer_{args.cell_info_mode}_fold{args.test_fold}_seed{args.seed}"
+        dim_suffix = f"_{args.cell_info_dim}d" if args.cell_info_mode != "none" else ""
+        experiment_name = f"gin_{args.num_gnn_layers}layer_{args.cell_info_mode}{dim_suffix}_fold{args.test_fold}_seed{args.seed}"
         json_path = Path(args.output_dir) / "results" / f"{experiment_name}.json"
         if json_path.exists():
             print(f"SKIP: {experiment_name} (JSON exists)")
@@ -82,8 +83,10 @@ def main() -> None:
             cur = conn.cursor()
             cur.execute(
                 "SELECT COUNT(*) FROM bipartite_experiments "
-                "WHERE fold=%s AND seed=%s AND num_gnn_layers=%s AND hop_distance=%s AND cell_info_mode=%s",
-                (args.test_fold, args.seed, args.num_gnn_layers, args.hop_distance, args.cell_info_mode),
+                "WHERE fold=%s AND seed=%s AND num_gnn_layers=%s AND hop_distance=%s "
+                "AND cell_info_mode=%s AND cell_info_dim=%s",
+                (args.test_fold, args.seed, args.num_gnn_layers, args.hop_distance,
+                 args.cell_info_mode, args.cell_info_dim),
             )
             if cur.fetchone()[0] > 0:
                 print(f"SKIP: {experiment_name} (already in DB)")
@@ -136,7 +139,8 @@ def main() -> None:
     )
 
     # ---- Callbacks ----
-    experiment_name = f"gin_{args.num_gnn_layers}layer_{args.cell_info_mode}_fold{args.test_fold}_seed{args.seed}"
+    dim_suffix = f"_{args.cell_info_dim}d" if args.cell_info_mode != "none" else ""
+    experiment_name = f"gin_{args.num_gnn_layers}layer_{args.cell_info_mode}{dim_suffix}_fold{args.test_fold}_seed{args.seed}"
     checkpoint_dir = Path(args.output_dir) / "checkpoints" / experiment_name
 
     checkpoint_cb = ModelCheckpoint(
@@ -211,6 +215,7 @@ def main() -> None:
         hop_distance=args.hop_distance,
         border_distance=args.border_distance,
         cell_info_mode=args.cell_info_mode,
+        cell_info_dim=args.cell_info_dim,
         lr=args.lr,
         weight_decay=args.weight_decay,
         batch_size=args.batch_size,
