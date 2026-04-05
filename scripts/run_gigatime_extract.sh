@@ -33,13 +33,15 @@ NUM_CHUNKS=${NUM_CHUNKS:-8}
 
 WSI_DIR="${WSI_DIR:-/userfiles/cgunduz/new_datasets/pannet_dataset/IPS/PANNET Slides}"
 H5_DIR="${H5_DIR:-${WSI_FEATURES_DIR:-/userfiles/cgunduz/new_datasets/pannet_dataset/IPS/pannet_wsi_features/40x_1024px_0px_overlap/features_virchow2}}"
+OUTPUT_DIR="${OUTPUT_DIR:-/scratch/hcakmak20/pannet_pipeline/gigatime_features}"
 
-mkdir -p "$PROJECT_DIR/logs"
+mkdir -p "$PROJECT_DIR/logs" "$OUTPUT_DIR"
 
 echo "=== Chunk $CHUNK/$NUM_CHUNKS: Extracting GigaTIME protein counts ==="
 uv run python -m src.stage1_extraction.extract_gigatime \
     --h5-dir "$H5_DIR" \
     --wsi-dir "$WSI_DIR" \
+    --output-dir "$OUTPUT_DIR" \
     --chunk "$CHUNK" \
     --num-chunks "$NUM_CHUNKS"
 

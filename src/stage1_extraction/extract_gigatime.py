@@ -66,11 +66,17 @@ def load_gigatime(device: str = "cuda") -> torch.nn.Module:
     local_dir = snapshot_download(repo_id="prov-gigatime/GigaTIME", token=token)
     weights_path = os.path.join(local_dir, "model.pth")
 
-    state_dict = torch.load(weights_path, map_location="cpu")
+    state_dict = torch.load(weights_path, map_location="cpu", weights_only=True)
     model.load_state_dict(state_dict)
 
     model = model.to(device)
     model.eval()
+
+    # Warmup forward pass to initialize cuDNN
+    with torch.no_grad():
+        dummy = torch.zeros(1, 3, TILE_SIZE, TILE_SIZE, device=device)
+        model(dummy)
+
     return model
 
 
@@ -126,6 +132,7 @@ def extract_protein_counts(
 def process_h5_file(
     h5_path: Path,
     wsi_dir: Path,
+    output_dir: Path,
     model: torch.nn.Module,
     device: str = "cuda",
 ) -> bool:
@@ -133,21 +140,23 @@ def process_h5_file(
     Extract GigaTIME protein counts for all patches in one H5 file.
 
     Opens the corresponding WSI, reads each patch at its stored coordinates,
-    runs GigaTIME, and saves gigatime_features back into the H5 file.
+    runs GigaTIME, and saves gigatime_features as a separate .npy file in
+    output_dir (since the original H5 files may be read-only).
 
     Returns True on success, False on failure.
     """
     from openslide import OpenSlide
 
     try:
+        # Check if already processed
+        out_path = output_dir / (h5_path.stem + "_gigatime.npy")
+        if out_path.exists():
+            print(f"  Skipping {h5_path.name} — {out_path.name} already exists")
+            return True
+
         with h5py.File(h5_path, "r") as f:
             coords = f["coords"][:]
             num_patches = len(coords)
-
-            # Check if already processed
-            if "gigatime_features" in f:
-                print(f"  Skipping {h5_path.name} — gigatime_features already exists")
-                return True
 
         # Find the corresponding WSI file
         # H5 name: "#1-1 7817B8509.h5" → WSI: "#1-1 7817B8509.tiff"
@@ -179,11 +188,9 @@ def process_h5_file(
 
         wsi.close()
 
-        # Save back into H5 file
-        with h5py.File(h5_path, "r+") as f:
-            if "gigatime_features" in f:
-                del f["gigatime_features"]
-            f.create_dataset("gigatime_features", data=protein_counts)
+        # Save as separate .npy file
+        np.save(out_path, protein_counts)
+        print(f"  Saved {out_path.name}: shape {protein_counts.shape}")
 
         return True
 
@@ -198,6 +205,7 @@ def main() -> None:
     )
     parser.add_argument("--h5-dir", required=True, help="Directory with H5 feature files")
     parser.add_argument("--wsi-dir", required=True, help="Directory with WSI .tiff files")
+    parser.add_argument("--output-dir", required=True, help="Directory to save .npy feature files")
     parser.add_argument("--device", default="cuda")
     parser.add_argument("--chunk", type=int, default=0)
     parser.add_argument("--num-chunks", type=int, default=1)
@@ -205,6 +213,8 @@ def main() -> None:
 
     h5_dir = Path(args.h5_dir)
     wsi_dir = Path(args.wsi_dir)
+    output_dir = Path(args.output_dir)
+    output_dir.mkdir(parents=True, exist_ok=True)
 
     # Get this chunk's H5 files
     all_h5 = sorted(h5_dir.glob("*.h5"))
@@ -225,7 +235,7 @@ def main() -> None:
     failed = 0
     for h5_path in my_h5:
         print(f"Processing: {h5_path.name}")
-        if process_h5_file(h5_path, wsi_dir, model, args.device):
+        if process_h5_file(h5_path, wsi_dir, output_dir, model, args.device):
             success += 1
         else:
             failed += 1

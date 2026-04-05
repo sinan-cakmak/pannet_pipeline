@@ -35,15 +35,19 @@ from src.stage3_graph.builder import build_graph
 from src.utils import load_wsi_info
 
 
-def parse_gigatime_features(h5_file: h5py.File) -> np.ndarray | None:
+def load_gigatime_features(h5_path: Path, gigatime_dir: Path | None) -> np.ndarray | None:
     """
-    Load GigaTIME protein counts from H5 file.
+    Load GigaTIME protein counts from a separate .npy file.
 
-    Returns (N, 21) float32 array, or None if the dataset doesn't exist.
+    Looks for <stem>_gigatime.npy in gigatime_dir.
+    Returns (N, 21) float32 array, or None if not found.
     """
-    if "gigatime_features" not in h5_file:
+    if gigatime_dir is None:
         return None
-    return h5_file["gigatime_features"][:].astype(np.float32)
+    npy_path = gigatime_dir / (h5_path.stem + "_gigatime.npy")
+    if not npy_path.exists():
+        return None
+    return np.load(npy_path).astype(np.float32)
 
 
 def parse_cell_types_v2(h5_file: h5py.File) -> np.ndarray | None:
@@ -108,6 +112,8 @@ def main() -> None:
     parser.add_argument("--device", default="cpu")
     parser.add_argument("--cell-source", default="none", choices=["none", "hovernet", "gigatime"],
                         help="Source of cell/protein info: none, hovernet (patch_cell_types_v2), gigatime")
+    parser.add_argument("--gigatime-dir", default=None,
+                        help="Directory with GigaTIME .npy files (required when --cell-source=gigatime)")
     parser.add_argument("--chunk", type=int, default=0, help="Which chunk (0-indexed)")
     parser.add_argument("--num-chunks", type=int, default=1, help="Total parallel chunks")
     args = parser.parse_args()
@@ -123,6 +129,9 @@ def main() -> None:
     # Load frozen autoencoder encoder
     print(f"Loading autoencoder from: {args.ae_checkpoint}")
     encoder = load_encoder(args.ae_checkpoint, args.device)
+
+    # GigaTIME features directory (if using --cell-source gigatime)
+    gigatime_dir = Path(args.gigatime_dir) if args.gigatime_dir else None
 
     # Process H5 files (chunked for parallel execution)
     h5_dir = Path(args.h5_dir)
@@ -154,7 +163,7 @@ def main() -> None:
             slide_height = int(f.attrs.get("slide_height", coords[:, 1].max() + 1024))
             # Parse cell/protein information based on source
             if args.cell_source == "gigatime":
-                cell_info = parse_gigatime_features(f)
+                cell_info = load_gigatime_features(h5_file, gigatime_dir)
             elif args.cell_source == "hovernet":
                 cell_info = parse_cell_types_v2(f)
             else:
