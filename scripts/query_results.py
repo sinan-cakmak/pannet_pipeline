@@ -16,23 +16,26 @@ SELECT
 FROM bipartite_experiments
 WHERE cell_info_mode = %s
   AND cell_info_dim = %s
+  AND log_normalize = %s
 """
 
 def main():
     parser = argparse.ArgumentParser(description="Query aggregated experiment results")
     parser.add_argument("--cell-info-mode", required=True, choices=["none", "concat", "gate"])
     parser.add_argument("--cell-info-dim", type=int, default=4)
+    parser.add_argument("--log-normalize", action="store_true")
     args = parser.parse_args()
 
     conn = psycopg2.connect(CONN_STRING)
     cur = conn.cursor()
-    cur.execute(SQL, (args.cell_info_mode, args.cell_info_dim))
+    cur.execute(SQL, (args.cell_info_mode, args.cell_info_dim, args.log_normalize))
     row = cur.fetchone()
     cols = [desc[0] for desc in cur.description]
     cur.close()
     conn.close()
 
-    print(f"\ncell_info_mode={args.cell_info_mode}, cell_info_dim={args.cell_info_dim}")
+    log_str = ", log_normalize=True" if args.log_normalize else ""
+    print(f"\ncell_info_mode={args.cell_info_mode}, cell_info_dim={args.cell_info_dim}{log_str}")
     print("=" * 40)
     for name, val in zip(cols, row):
         print(f"  {name:15s}: {val}")
