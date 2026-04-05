@@ -55,6 +55,8 @@ def main() -> None:
     parser.add_argument("--border-distance", type=int, default=3)
     parser.add_argument("--cell-info-mode", default="none", choices=["none", "concat", "gate"],
                         help="How to use cell_information: none=ignore, concat=append, gate=cell-conditioned conv")
+    parser.add_argument("--cell-info-dim", type=int, default=4,
+                        help="Dimension of cell_information vector (4=HoVer-Net, 21=GigaTIME)")
     parser.add_argument("--batch-size", type=int, default=8)
     parser.add_argument("--max-epochs", type=int, default=200)
     parser.add_argument("--lr", type=float, default=1e-4)
@@ -107,7 +109,10 @@ def main() -> None:
 
     # ---- Create model ----
     if args.cell_info_mode == "gate":
-        feature_extractor = CellConditionedGIN(num_layers=args.num_gnn_layers)
+        feature_extractor = CellConditionedGIN(
+            num_layers=args.num_gnn_layers,
+            cell_info_dim=args.cell_info_dim,
+        )
     else:
         feature_extractor = GINFeatureExtractor(num_layers=args.num_gnn_layers)
 
@@ -117,6 +122,7 @@ def main() -> None:
         lr=args.lr,
         weight_decay=args.weight_decay,
         cell_info_mode=args.cell_info_mode,
+        cell_info_dim=args.cell_info_dim,
     )
 
     # ---- Data ----

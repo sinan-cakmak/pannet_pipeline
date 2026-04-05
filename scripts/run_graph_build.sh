@@ -29,6 +29,7 @@ NUM_CHUNKS=${NUM_CHUNKS:-8}
 
 H5_DIR="${H5_DIR:-${WSI_FEATURES_DIR:-/userfiles/cgunduz/new_datasets/pannet_dataset/IPS/pannet_wsi_features/40x_1024px_0px_overlap/features_virchow2}}"
 GRAPH_DIR="${GRAPH_DIR:-/scratch/hcakmak20/pannet_pipeline/graphs}"
+CELL_SOURCE="${CELL_SOURCE:-none}"
 # Auto-detect latest autoencoder checkpoint (lowest val_loss)
 AE_CKPT="${AE_CKPT:-$(ls -t "$PROJECT_DIR"/checkpoints/autoencoder/autoencoder-*.ckpt 2>/dev/null | head -1)}"
 if [ -z "$AE_CKPT" ]; then echo "ERROR: No autoencoder checkpoint found"; exit 1; fi
@@ -44,6 +45,7 @@ for DISTANCE in 1 2 3; do
         --ae-checkpoint "$AE_CKPT" \
         --hop-distance "$DISTANCE" \
         --border-distance "$DISTANCE" \
+        --cell-source "$CELL_SOURCE" \
         --device cuda \
         --chunk "$CHUNK" \
         --num-chunks "$NUM_CHUNKS"

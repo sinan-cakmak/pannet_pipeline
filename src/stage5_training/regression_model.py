@@ -46,10 +46,12 @@ class InfiltrationModel(L.LightningModule):
         lr: float = 1e-4,
         weight_decay: float = 1e-3,
         cell_info_mode: str = "none",
+        cell_info_dim: int = 4,
     ):
         super().__init__()
         self.save_hyperparameters(ignore=["projector", "feature_extractor"])
         self.cell_info_mode = cell_info_mode
+        self.cell_info_dim = cell_info_dim
 
         # Frozen projector: compresses 1280-d VirChow2 → 256-d
         self.projector = projector
@@ -57,10 +59,10 @@ class InfiltrationModel(L.LightningModule):
             param.requires_grad = False
 
         # Input normalization after projection
-        # For "concat" mode, input is 256 + 4 = 260, need separate projection back to 256
+        # For "concat" mode, input is 256 + cell_info_dim, need projection back to 256
         if cell_info_mode == "concat":
             self.input_norm = nn.Sequential(
-                nn.Linear(AUTOENCODER_DIM + 4, AUTOENCODER_DIM),
+                nn.Linear(AUTOENCODER_DIM + cell_info_dim, AUTOENCODER_DIM),
                 nn.RMSNorm(AUTOENCODER_DIM),
             )
         else:
@@ -109,7 +111,7 @@ class InfiltrationModel(L.LightningModule):
             if cell_info is not None:
                 x = torch.cat([x, cell_info], dim=-1)  # (N, 260)
             else:
-                x = torch.cat([x, torch.zeros(x.shape[0], 4, device=x.device)], dim=-1)
+                x = torch.cat([x, torch.zeros(x.shape[0], self.cell_info_dim, device=x.device)], dim=-1)
 
         x = self.input_norm(x)
 
@@ -117,7 +119,7 @@ class InfiltrationModel(L.LightningModule):
         if self.cell_info_mode == "gate":
             cell_info = getattr(data, "cell_information", None)
             if cell_info is None:
-                cell_info = torch.zeros(x.shape[0], 4, device=x.device)
+                cell_info = torch.zeros(x.shape[0], self.cell_info_dim, device=x.device)
             h = self.feature_extractor(x, data.edge_index, data.batch, data.patch_classes, cell_info)
         else:
             h = self.feature_extractor(x, data.edge_index, data.batch, data.patch_classes)

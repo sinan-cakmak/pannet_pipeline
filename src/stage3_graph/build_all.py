@@ -35,6 +35,17 @@ from src.stage3_graph.builder import build_graph
 from src.utils import load_wsi_info
 
 
+def parse_gigatime_features(h5_file: h5py.File) -> np.ndarray | None:
+    """
+    Load GigaTIME protein counts from H5 file.
+
+    Returns (N, 21) float32 array, or None if the dataset doesn't exist.
+    """
+    if "gigatime_features" not in h5_file:
+        return None
+    return h5_file["gigatime_features"][:].astype(np.float32)
+
+
 def parse_cell_types_v2(h5_file: h5py.File) -> np.ndarray | None:
     """
     Parse patch_cell_types_v2 from H5 into a (N, 4) cell_information array.
@@ -95,6 +106,8 @@ def main() -> None:
     parser.add_argument("--hop-distance", type=int, default=3)
     parser.add_argument("--border-distance", type=int, default=3)
     parser.add_argument("--device", default="cpu")
+    parser.add_argument("--cell-source", default="none", choices=["none", "hovernet", "gigatime"],
+                        help="Source of cell/protein info: none, hovernet (patch_cell_types_v2), gigatime")
     parser.add_argument("--chunk", type=int, default=0, help="Which chunk (0-indexed)")
     parser.add_argument("--num-chunks", type=int, default=1, help="Total parallel chunks")
     args = parser.parse_args()
@@ -139,8 +152,13 @@ def main() -> None:
             tissue_ids = f["tissue_id"][:] if "tissue_id" in f else np.zeros(len(features), dtype=np.int64)
             slide_width = int(f.attrs.get("slide_width", coords[:, 0].max() + 1024))
             slide_height = int(f.attrs.get("slide_height", coords[:, 1].max() + 1024))
-            # Parse cell counts from Nusret's patch_cell_types_v2 (JSON strings → numeric array)
-            cell_info = parse_cell_types_v2(f)
+            # Parse cell/protein information based on source
+            if args.cell_source == "gigatime":
+                cell_info = parse_gigatime_features(f)
+            elif args.cell_source == "hovernet":
+                cell_info = parse_cell_types_v2(f)
+            else:
+                cell_info = None
 
         # Only use first 1280 dims (VirChow2 output)
         if features.shape[1] > 1280:

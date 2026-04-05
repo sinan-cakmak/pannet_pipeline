@@ -34,6 +34,7 @@ echo "Using AE checkpoint: $AE_CKPT"
 NUM_LAYERS="${NUM_LAYERS:-1}"
 BORDER_DISTANCE="${BORDER_DISTANCE:-3}"
 CELL_INFO_MODE="${CELL_INFO_MODE:-none}"
+CELL_INFO_DIM="${CELL_INFO_DIM:-4}"
 
 CHUNK=${SLURM_ARRAY_TASK_ID:-0}
 NUM_CHUNKS=8
@@ -72,6 +73,8 @@ for COMBO in "${ALL_COMBOS[@]}"; do
             --border-distance "${BORDER_DISTANCE}" \
             --batch-size 8 \
             --max-epochs 200 \
+            --cell-info-mode "$CELL_INFO_MODE" \
+            --cell-info-dim "$CELL_INFO_DIM" \
             --output-dir experiments \
             --skip-existing
     fi

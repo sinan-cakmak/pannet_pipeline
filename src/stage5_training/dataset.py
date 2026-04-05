@@ -62,11 +62,17 @@ class GraphDataset(Dataset):
             self.files = all_files
 
         # Pre-load grade labels for WeightedRandomSampler
+        # and auto-detect cell_info_dim from the first graph that has it
         self._grade_labels = []
+        self._cell_info_dim = 4  # default (HoVer-Net)
+        cell_dim_detected = False
         for f in self.files:
             with open(f, "rb") as fp:
                 data = pickle.load(fp)
             self._grade_labels.append(data.y.item())
+            if not cell_dim_detected and hasattr(data, "cell_information") and data.cell_information is not None:
+                self._cell_info_dim = data.cell_information.shape[1]
+                cell_dim_detected = True
         self._grade_labels = np.array(self._grade_labels)
 
     @property
@@ -93,6 +99,6 @@ class GraphDataset(Dataset):
         else:
             # Always provide cell_information so PyG batching works
             # (zeros = "no cell data available" — gate learns to pass through)
-            data.cell_information = torch.zeros(data.x.shape[0], 4)
+            data.cell_information = torch.zeros(data.x.shape[0], self._cell_info_dim)
 
         return data
