@@ -69,14 +69,11 @@ def load_gigatime(device: str = "cuda") -> torch.nn.Module:
     state_dict = torch.load(weights_path, map_location="cpu", weights_only=True)
     model.load_state_dict(state_dict)
 
+    # Disable cuDNN — avoids CUDNN_STATUS_NOT_INITIALIZED on some CUDA drivers
+    torch.backends.cudnn.enabled = False
+
     model = model.to(device)
     model.eval()
-
-    # Warmup forward pass to initialize cuDNN
-    with torch.no_grad():
-        dummy = torch.zeros(1, 3, TILE_SIZE, TILE_SIZE, device=device)
-        model(dummy)
-
     return model
 
 
