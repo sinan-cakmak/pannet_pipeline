@@ -69,10 +69,7 @@ def load_gigatime(device: str = "cuda") -> torch.nn.Module:
     state_dict = torch.load(weights_path, map_location="cpu", weights_only=True)
     model.load_state_dict(state_dict)
 
-    # Disable cuDNN — avoids CUDNN_STATUS_NOT_INITIALIZED on some CUDA drivers
-    torch.backends.cudnn.enabled = False
-
-    model = model.to(device)
+    model = model.to(device).half()  # float16 for faster inference
     model.eval()
     return model
 
@@ -107,21 +104,21 @@ def extract_protein_counts(
         TILES_PER_SIDE, TILE_SIZE, TILES_PER_SIDE, TILE_SIZE, 3
     ).transpose(0, 2, 1, 3, 4).reshape(TILES_PER_PATCH, TILE_SIZE, TILE_SIZE, 3)
 
-    # HWC → CHW and to tensor: (16, 3, 256, 256)
-    tiles_tensor = torch.from_numpy(tiles.transpose(0, 3, 1, 2)).to(device)
+    # HWC → CHW and to tensor: (16, 3, 256, 256) in float16
+    tiles_tensor = torch.from_numpy(tiles.transpose(0, 3, 1, 2)).half().to(device)
 
     # Batch inference
     with torch.no_grad():
         logits = model(tiles_tensor)  # (16, 23, 256, 256)
 
     # Sigmoid → threshold → binary masks
-    masks = (torch.sigmoid(logits) > 0.5).float()
+    masks = (torch.sigmoid(logits) > 0.5)
 
     # Select functional channels (exclude TRITC=1, Cy5=2)
     masks = masks[:, GIGATIME_FUNCTIONAL_INDICES, :, :]  # (16, 21, 256, 256)
 
     # Sum positive pixels across tiles and spatial dims → (21,)
-    counts = masks.sum(dim=(0, 2, 3)).cpu().numpy().astype(np.int64)
+    counts = masks.sum(dim=(0, 2, 3)).int().cpu().numpy().astype(np.int64)
 
     return counts
 
